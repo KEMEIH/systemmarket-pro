@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  VENDOR
+  CLIENT
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  DELISTED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MPESA_INTASEND
+  PAYPAL_MPESA
+  CARD
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PENDING_MPESA_CONFIRMATION
+  PAYPAL_PENDING
+}
+
+model User {
+  id                String          @id @default(cuid())
+  email             String          @unique
+  name              String
+  phone             String?
+  avatar            String?
+  company           String?
+  role              UserRole        @default(CLIENT)
+  emailVerified     Boolean         @default(false)
+  isActive          Boolean         @default(true)
+  vendorApproved    Boolean         @default(false)
+  bio               String?
+  socialLinks       Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  products          Product[]
+  orders            Order[]
+  purchases         Purchase[]
+  customizations    Customization[]
+  reviews           Review[]
+  notifications     Notification[]
+  transactions      Transaction[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Product {
+  id                String          @id @default(cuid())
+  vendorId          String
+  name              String
+  slug              String          @unique
+  description       String
+  shortDescription  String?
+  price             Float
+  salePrice         Float?
+  category          String
+  subcategory       String?
+  tags              String[]
+  technologies      String[]
+  features          String[]
+  screenshots       String[]
+  videoUrl          String?
+  demoUrl           String?
+  demoZip           String?
+  downloadUrl       String?
+  documentation     String?
+  changelog         Json?
+  status            ProductStatus   @default(DRAFT)
+  views             Int             @default(0)
+  downloads         Int             @default(0)
+  rating            Float           @default(0)
+  reviewCount       Int             @default(0)
+  isFeatured        Boolean         @default(false)
+  isTrending        Boolean         @default(false)
+  customizationEnabled Boolean       @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  vendor            User            @relation(fields: [vendorId], references: [id])
+  orders            Order[]
+  purchases         Purchase[]
+  reviews           Review[]
+  customizations    Customization[]
+
+  @@index([vendorId])
+  @@index([category])
+  @@index([status])
+  @@index([slug])
+}
+
+model Order {
+  id                String          @id @default(cuid())
+  orderNumber       String          @unique
+  clientId          String
+  productId         String
+  vendorId          String
+  amount            Float
+  currency          String          @default("KES")
+  status            OrderStatus     @default(PENDING)
+  paymentStatus     PaymentStatus   @default(PENDING)
+  licenseKey        String?
+  purchaseCode      String?
+  downloadedAt      DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  client            User            @relation("ClientOrders", fields: [clientId], references: [id])
+  product           Product         @relation(fields: [productId], references: [id])
+  vendor            User            @relation("VendorOrders", fields: [vendorId], references: [id])
+  purchase          Purchase?
+  transaction       Transaction?
+
+  @@index([orderNumber])
+  @@index([clientId])
+  @@index([vendorId])
+}
+
+model Purchase {
+  id                String          @id @default(cuid())
+  orderId           String          @unique
+  clientId          String
+  productId         String
+  vendorId          String
+  amount            Float
+  currency          String          @default("KES")
+  purchaseDate      DateTime        @default(now())
+  downloadLimit     Int             @default(5)
+  downloadCount     Int             @default(0)
+  licenseKey        String?
+  purchaseCode      String?
+  isActive          Boolean         @default(true)
+
+  order             Order           @relation(fields: [orderId], references: [id])
+  client            User            @relation("ClientPurchases", fields: [clientId], references: [id])
+  product           Product         @relation(fields: [productId], references: [id])
+  vendor            User            @relation("VendorPurchases", fields: [vendorId], references: [id])
+
+  @@index([clientId])
+  @@index([productId])
+}
+
+model Transaction {
+  id                String          @id @default(cuid())
+  orderId           String
+  clientId          String
+  vendorId          String
+  amount            Float
+  currency          String          @default("KES")
+  method            PaymentMethod
+  status            PaymentStatus   @default(PENDING)
+  
+  intasendChargeId  String?         @unique
+  intasendReference String?
+  mpesaCode         String?
+  mpesaPhone        String?
+  
+  paypalOrderId     String?         @unique
+  paypalCaptureId   String?
+  paypalPayerId     String?
+  paypalEmail       String?
+  
+  description       String?
+  metadata          Json?
+  processedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  order             Order           @relation(fields: [orderId], references: [id])
+  client            User            @relation(fields: [clientId], references: [id])
+  vendor            User            @relation(fields: [vendorId], references: [id])
+
+  @@index([orderId])
+  @@index([clientId])
+  @@index([status])
+  @@index([method])
+}
+
+model Customization {
+  id                String          @id @default(cuid())
+  clientId          String
+  productId         String
+  vendorId          String
+  name              String
+  email             String
+  phone             String?
+  company           String?
+  requirements      String
+  budget            Float?
+  deadline          DateTime?
+  attachments       String[]
+  status            String          @default("PENDING")
+  quotation         String?
+  quotationAmount   Float?
+  progress          Int             @default(0)
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  client            User            @relation(fields: [clientId], references: [id])
+  product           Product         @relation(fields: [productId], references: [id])
+  vendor            User            @relation(fields: [vendorId], references: [id])
+
+  @@index([clientId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+model Review {
+  id                String          @id @default(cuid())
+  clientId          String
+  productId         String
+  orderId           String
+  rating            Int
+  comment           String?
+  isVerified        Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  client            User            @relation(fields: [clientId], references: [id])
+  product           Product         @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([clientId])
+}
+
+model Notification {
+  id                String          @id @default(cuid())
+  userId            String
+  title             String
+  message           String
+  link              String?
+  isRead            Boolean         @default(false)
+  type              String
+  createdAt         DateTime        @default(now())
+
+  user              User            @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model Blog {
+  id                String          @id @default(cuid())
+  title             String
+  slug              String          @unique
+  excerpt           String?
+  content           String
+  featuredImage     String?
+  authorId          String
+  category          String
+  tags              String[]
+  views             Int             @default(0)
+  isPublished       Boolean         @default(false)
+  publishedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  author            User            @relation(fields: [authorId], references: [id])
+
+  @@index([slug])
+  @@index([isPublished])
+}
+
+model Settings {
+  id                String          @id @default(cuid())
+  key               String          @unique
+  value             Json
+  updatedAt         DateTime        @updatedAt
+
+  @@index([key])
+}
