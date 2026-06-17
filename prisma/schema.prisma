@@ -63,15 +63,33 @@ model User {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  // Relations
   products          Product[]
-  orders            Order[]         @relation("ClientOrders")    // client side
-  vendorOrders      Order[]         @relation("VendorOrders")    // vendor side
-  purchases         Purchase[]
-  customizations    Customization[]
+  
+  // Orders
+  orders            Order[]         @relation("ClientOrders")
+  vendorOrders      Order[]         @relation("VendorOrders")
+  
+  // Purchases (split into two directions)
+  clientPurchases   Purchase[]      @relation("ClientPurchases")
+  vendorPurchases   Purchase[]      @relation("VendorPurchases")
+  
+  // Customizations (split into two directions)
+  clientCustomizations Customization[] @relation("ClientCustomizations")
+  vendorCustomizations Customization[] @relation("VendorCustomizations")
+  
+  // Reviews
   reviews           Review[]
+  
+  // Notifications
   notifications     Notification[]
-  transactions      Transaction[]   @relation("ClientTransactions")
-  vendorTransactions Transaction[]   @relation("VendorTransactions")
+  
+  // Transactions (split into two directions)
+  clientTransactions Transaction[]  @relation("ClientTransactions")
+  vendorTransactions Transaction[]  @relation("VendorTransactions")
+  
+  // Blogs (one-to-many)
+  blogs             Blog[]
 
   @@index([email])
   @@index([role])
@@ -174,7 +192,7 @@ model Purchase {
 
 model Transaction {
   id                String          @id @default(cuid())
-  orderId           String
+  orderId           String          @unique         // ← added @unique for one-to-one
   clientId          String
   vendorId          String
   amount            Float
